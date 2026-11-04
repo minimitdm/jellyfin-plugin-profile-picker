@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deux cibles de build :
+      dotnet build -p:JellyfinTarget=12     -> net10.0 / Jellyfin 12.x   (par défaut)
+      dotnet build -p:JellyfinTarget=10.11  -> net9.0  / Jellyfin 10.11.x
+  -->
+  <PropertyGroup>
+    <JellyfinTarget Condition="'$(JellyfinTarget)' == ''">12</JellyfinTarget>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinTarget)' == '12'">
+    <TargetFramework>net10.0</TargetFramework>
+    <JellyfinPackageVersion>12.0.0</JellyfinPackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinTarget)' == '10.11'">
+    <TargetFramework>net9.0</TargetFramework>
+    <JellyfinPackageVersion>10.11.5</JellyfinPackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RootNamespace>Jellyfin.Plugin.ProfilePicker</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.ProfilePicker</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinPackageVersion)">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinPackageVersion)">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Configuration\configPage.html" />
+    <EmbeddedResource Include="Configuration\configPage.html" />
+    <None Remove="Web\**" />
+    <EmbeddedResource Include="Web\**" />
+    <None Remove="Avatars\**" />
+    <EmbeddedResource Include="Avatars\**\*.png" />
+  </ItemGroup>
+
+</Project>

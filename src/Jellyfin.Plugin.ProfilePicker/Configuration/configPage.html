@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Profile Picker</title>
+</head>
+<body>
+<div id="ProfilePickerConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+    <style>
+        #ProfilePickerConfigPage .ppc-section { margin: 0 0 2.5em; }
+        #ProfilePickerConfigPage .ppc-status { padding: .9em 1.1em; border-radius: 6px; background: rgba(255,255,255,.06); display: flex; gap: 1em; align-items: center; flex-wrap: wrap; }
+        #ProfilePickerConfigPage .ppc-dot { width: .75em; height: .75em; border-radius: 50%; background: #c33; flex: none; }
+        #ProfilePickerConfigPage .ppc-dot.ok { background: #3c3; }
+        #ProfilePickerConfigPage .ppc-status code { opacity: .7; font-size: .85em; word-break: break-all; }
+        #ProfilePickerConfigPage .ppc-users { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.2em; }
+        #ProfilePickerConfigPage .ppc-user { display: flex; flex-direction: column; align-items: center; gap: .5em; padding: 1em; border-radius: 8px; background: rgba(255,255,255,.04); text-align: center; }
+        #ProfilePickerConfigPage .ppc-user img, #ProfilePickerConfigPage .ppc-user .ppc-initial { width: 96px; height: 96px; border-radius: 8px; object-fit: cover; }
+        #ProfilePickerConfigPage .ppc-initial { display: flex; align-items: center; justify-content: center; font-size: 2.6em; font-weight: 700; background: #444; }
+        #ProfilePickerConfigPage .ppc-user .emby-button { margin: 0; font-size: .85em; }
+        #ProfilePickerConfigPage .ppc-user label { font-size: .85em; display: flex; gap: .4em; align-items: center; cursor: pointer; }
+        #ProfilePickerConfigPage .ppc-name { font-weight: 600; }
+        #ProfilePickerConfigPage .ppc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; }
+        #ProfilePickerConfigPage .ppc-av { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; border: 0; padding: 0; background: none; }
+        #ProfilePickerConfigPage .ppc-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        #ProfilePickerConfigPage .ppc-av:hover { outline: 3px solid #fff; }
+        #ProfilePickerConfigPage .ppc-del { position: absolute; top: 3px; right: 3px; background: rgba(0,0,0,.75); color: #fff; border: 0; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; cursor: pointer; font-size: 13px; padding: 0; }
+        #ProfilePickerConfigPage .ppc-cat { margin: 1em 0 .5em; font-size: .8em; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
+        #ppc-dialog { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; padding: 4%; }
+        #ppc-dialog.open { display: flex; }
+        #ppc-dialog .ppc-card { background: #1c1c1c; border-radius: 10px; padding: 1.5em; width: min(720px, 100%); max-height: 85vh; overflow: auto; }
+        #ProfilePickerConfigPage .ppc-row { display: flex; gap: 1em; flex-wrap: wrap; align-items: end; }
+        #ProfilePickerConfigPage .ppc-row > .inputContainer, #ProfilePickerConfigPage .ppc-row > .selectContainer { flex: 1 1 220px; }
+    </style>
+
+    <div data-role="content">
+        <div class="content-primary">
+
+            <div class="ppc-section">
+                <h2 class="sectionTitle">Profile Picker</h2>
+                <div class="ppc-status">
+                    <span class="ppc-dot" id="ppcDot"></span>
+                    <div style="flex:1;min-width:200px">
+                        <div id="ppcStatusMsg">Vérification…</div>
+                        <code id="ppcStatusPath"></code>
+                    </div>
+                    <button is="emby-button" type="button" class="raised emby-button" id="ppcReinject"><span>Réinjecter le script</span></button>
+                </div>
+                <div class="fieldDescription" style="margin-top:.6em">
+                    Après une mise à jour de Jellyfin, l'index.html de jellyfin-web est remplacé : le plugin le ré-injecte au démarrage.
+                    Rafraîchis le navigateur (Ctrl+F5) après chaque changement.
+                </div>
+            </div>
+
+            <form id="ProfilePickerConfigForm" class="ppc-section">
+                <h3 class="sectionTitle">Écran de sélection</h3>
+
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="Enabled" />
+                    <span>Activer l'écran « Qui regarde ? » sur la page de connexion</span>
+                </label>
+
+                <div class="ppc-row">
+                    <div class="selectContainer">
+                        <select is="emby-select" id="Theme" label="Thème">
+                            <option value="cinema">Cinéma — fond noir, avatars carrés</option>
+                            <option value="nightblue">Bleu nuit — dégradé, avatars ronds</option>
+                        </select>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="Title" label="Titre" />
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="color" id="AccentColor" label="Couleur d'accent" style="height:2.6em;padding:.2em" />
+                    </div>
+                </div>
+
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="PinMode" />
+                    <span>Saisie façon code PIN (les utilisateurs protégés ont un mot de passe numérique)</span>
+                </label>
+                <div class="inputContainer" style="max-width:220px">
+                    <input is="emby-input" type="number" id="PinLength" min="4" max="8" label="Longueur du PIN" />
+                </div>
+
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="ShowManualLogin" />
+                    <span>Afficher « Autre utilisateur » (formulaire classique)</span>
+                </label>
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="ShowQuickConnect" />
+                    <span>Afficher Quick Connect (si activé sur le serveur)</span>
+                </label>
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="RememberMe" />
+                    <span>Cocher « Se souvenir de moi » lors d'une connexion par profil</span>
+                </label>
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="AllowUserAvatarChoice" />
+                    <span>Autoriser chaque utilisateur à choisir un avatar prédéfini depuis son profil</span>
+                </label>
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="AutoInject" />
+                    <span>Injection automatique dans jellyfin-web (décocher si tu utilises JavaScript Injector)</span>
+                </label>
+
+                <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Enregistrer</span></button>
+            </form>
+
+            <div class="ppc-section">
+                <h3 class="sectionTitle">Profils</h3>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                    Seuls les utilisateurs visibles apparaissent sur l'écran de sélection (option Jellyfin « Masquer cet utilisateur des écrans de connexion »).
+                </div>
+                <div class="ppc-users" id="ppcUsers"></div>
+            </div>
+
+            <div class="ppc-section">
+                <h3 class="sectionTitle">Avatars personnalisés</h3>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                    PNG, JPEG, WEBP ou GIF, 3 Mo max — idéalement carré, 320×320 ou plus. Stockés dans <code id="ppcCustomDir"></code>.
+                </div>
+                <div class="ppc-row" style="margin-bottom:1em">
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="ppcUploadName" label="Nom de l'avatar" />
+                    </div>
+                    <input type="file" id="ppcUploadFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" />
+                    <button is="emby-button" type="button" class="raised emby-button" id="ppcUploadBtn"><span>Ajouter une image…</span></button>
+                </div>
+                <div class="ppc-grid" id="ppcCustom"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ppc-dialog">
+        <div class="ppc-card">
+            <h3 id="ppcDialogTitle" style="margin-top:0">Choisir un avatar</h3>
+            <div id="ppcDialogBody"></div>
+            <div style="text-align:right;margin-top:1em">
+                <button is="emby-button" type="button" class="raised emby-button" id="ppcDialogClose"><span>Fermer</span></button>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            var pluginId = '28e96038-2eff-428b-bdb2-c2115837e144';
+            var page = document.querySelector('#ProfilePickerConfigPage');
+            var bools = ['Enabled', 'PinMode', 'ShowManualLogin', 'ShowQuickConnect', 'RememberMe', 'AllowUserAvatarChoice', 'AutoInject'];
+            var texts = ['Theme', 'Title', 'AccentColor', 'PinLength'];
+
+            function $(sel) { return page.querySelector(sel); }
+            function authHeaders(extra) {
+                var h = { Authorization: 'MediaBrowser Token="' + ApiClient.accessToken() + '"' };
+                for (var k in (extra || {})) { h[k] = extra[k]; }
+                return h;
+            }
+            function api(path, opts) {
+                opts = opts || {};
+                opts.headers = authHeaders(opts.headers);
+                return fetch(ApiClient.getUrl(path), opts).then(function (r) {
+                    if (!r.ok) { return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); }); }
+                    var ct = r.headers.get('content-type') || '';
+                    return ct.indexOf('json') >= 0 ? r.json() : null;
+                });
+            }
+            function avatarUrl(id) { return ApiClient.getUrl('ProfilePicker/Avatars/' + encodeURIComponent(id)); }
+
+            // ----- Statut -----
+            function loadStatus() {
+                api('ProfilePicker/Status').then(function (s) {
+                    $('#ppcDot').classList.toggle('ok', !!s.injected);
+                    $('#ppcStatusMsg').textContent = s.message + (s.version ? ' — v' + s.version : '');
+                    $('#ppcStatusPath').textContent = s.indexPath || '';
+                    $('#ppcCustomDir').textContent = s.customAvatarDirectory || '';
+                }).catch(function (e) { $('#ppcStatusMsg').textContent = 'Statut indisponible : ' + e.message; });
+            }
+            $('#ppcReinject').addEventListener('click', function () {
+                api('ProfilePicker/Inject', { method: 'POST' }).then(loadStatus);
+            });
+
+            // ----- Configuration -----
+            function loadConfig() {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                    bools.forEach(function (k) { $('#' + k).checked = !!c[k]; });
+                    texts.forEach(function (k) { $('#' + k).value = c[k] != null ? c[k] : ''; });
+                    Dashboard.hideLoadingMsg();
+                });
+            }
+            $('#ProfilePickerConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                    bools.forEach(function (k) { c[k] = $('#' + k).checked; });
+                    c.Theme = $('#Theme').value;
+                    c.Title = $('#Title').value || 'Qui regarde ?';
+                    c.AccentColor = $('#AccentColor').value || '#e50914';
+                    c.PinLength = Math.max(4, Math.min(8, parseInt($('#PinLength').value, 10) || 4));
+                    ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
+                        Dashboard.processPluginConfigurationUpdateResult(r);
+                        setTimeout(loadStatus, 500);
+                    });
+                });
+                return false;
+            });
+
+            // ----- Sélecteur d'avatar -----
+            var dialog = $('#ppc-dialog');
+            function closeDialog() { dialog.classList.remove('open'); }
+            $('#ppcDialogClose').addEventListener('click', closeDialog);
+            dialog.addEventListener('click', function (e) { if (e.target === dialog) { closeDialog(); } });
+
+            function renderAvatarGrid(container, list, onClick, withDelete) {
+                container.innerHTML = '';
+                var cats = {}, order = [];
+                list.forEach(function (a) { if (!cats[a.category]) { cats[a.category] = []; order.push(a.category); } cats[a.category].push(a); });
+                order.forEach(function (cat) {
+                    if (!withDelete) {
+                        var h = document.createElement('div'); h.className = 'ppc-cat'; h.textContent = cat; container.appendChild(h);
+                    }
+                    var g = document.createElement('div'); g.className = 'ppc-grid';
+                    cats[cat].forEach(function (a) {
+                        var b = document.createElement('button'); b.type = 'button'; b.className = 'ppc-av'; b.title = a.name;
+                        var img = document.createElement('img'); img.loading = 'lazy'; img.src = avatarUrl(a.id); img.alt = a.name;
+                        b.appendChild(img);
+                        if (onClick) { b.addEventListener('click', function () { onClick(a); }); }
+                        if (withDelete) {
+                            var d = document.createElement('span'); d.className = 'ppc-del'; d.textContent = '✕'; d.title = 'Supprimer';
+                            d.addEventListener('click', function (e) {
+                                e.stopPropagation();
+                                if (!confirm('Supprimer « ' + a.name + ' » ?')) { return; }
+                                api('ProfilePicker/Avatars/' + encodeURIComponent(a.id), { method: 'DELETE' }).then(loadCustom);
+                            });
+                            b.appendChild(d);
+                        }
+                        g.appendChild(b);
+                    });
+                    container.appendChild(g);
+                });
+            }
+
+            function setUserAvatar(user, avatar) {
+                Dashboard.showLoadingMsg();
+                return fetch(avatarUrl(avatar.id)).then(function (r) { return r.blob(); }).then(function (blob) {
+                    var file = new File([blob], 'avatar.png', { type: blob.type || 'image/png' });
+                    return ApiClient.uploadUserImage(user.Id, 'Primary', file);
+                }).then(function () {
+                    Dashboard.hideLoadingMsg();
+                    closeDialog();
+                    loadUsers();
+                }, function (e) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Échec : ' + (e && e.message ? e.message : e));
+                });
+            }
+
+            function openPicker(user) {
+                $('#ppcDialogTitle').textContent = 'Avatar de ' + user.Name;
+                var body = $('#ppcDialogBody');
+                body.textContent = 'Chargement…';
+                dialog.classList.add('open');
+                api('ProfilePicker/Avatars').then(function (list) {
+                    renderAvatarGrid(body, list, function (a) { setUserAvatar(user, a); }, false);
+                });
+            }
+
+            // ----- Utilisateurs -----
+            function loadUsers() {
+                ApiClient.getUsers().then(function (users) {
+                    var c = $('#ppcUsers'); c.innerHTML = '';
+                    users.forEach(function (u) {
+                        var card = document.createElement('div'); card.className = 'ppc-user';
+                        if (u.PrimaryImageTag) {
+                            var img = document.createElement('img');
+                            img.src = ApiClient.getUserImageUrl(u.Id, { type: 'Primary', tag: u.PrimaryImageTag, maxHeight: 200 });
+                            card.appendChild(img);
+                        } else {
+                            var i = document.createElement('div'); i.className = 'ppc-initial'; i.textContent = (u.Name || '?').charAt(0).toUpperCase();
+                            card.appendChild(i);
+                        }
+                        var n = document.createElement('div'); n.className = 'ppc-name'; n.textContent = u.Name + (u.HasPassword ? ' 🔒' : '');
+                        card.appendChild(n);
+                        var b = document.createElement('button'); b.type = 'button'; b.className = 'raised emby-button'; b.textContent = 'Changer l\'avatar';
+                        b.addEventListener('click', function () { openPicker(u); });
+                        card.appendChild(b);
+                        var l = document.createElement('label');
+                        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !(u.Policy && u.Policy.IsHidden);
+                        cb.addEventListener('change', function () {
+                            var p = u.Policy; p.IsHidden = !cb.checked;
+                            ApiClient.updateUserPolicy(u.Id, p).catch(function () { cb.checked = !cb.checked; });
+                        });
+                        l.appendChild(cb); l.appendChild(document.createTextNode('Visible sur l\'écran'));
+                        card.appendChild(l);
+                        c.appendChild(card);
+                    });
+                });
+            }
+
+            // ----- Avatars personnalisés -----
+            function loadCustom() {
+                api('ProfilePicker/Avatars').then(function (list) {
+                    var custom = list.filter(function (a) { return a.custom; });
+                    var c = $('#ppcCustom');
+                    if (!custom.length) { c.innerHTML = '<div class="fieldDescription">Aucun avatar personnalisé.</div>'; return; }
+                    renderAvatarGrid(c, custom, null, true);
+                });
+            }
+            $('#ppcUploadBtn').addEventListener('click', function () { $('#ppcUploadFile').click(); });
+            $('#ppcUploadFile').addEventListener('change', function () {
+                var f = this.files && this.files[0];
+                if (!f) { return; }
+                var name = $('#ppcUploadName').value || f.name.replace(/\.[^.]+$/, '');
+                Dashboard.showLoadingMsg();
+                api('ProfilePicker/Avatars?name=' + encodeURIComponent(name), {
+                    method: 'POST', body: f, headers: { 'Content-Type': f.type || 'application/octet-stream' }
+                }).then(function () {
+                    Dashboard.hideLoadingMsg();
+                    $('#ppcUploadName').value = '';
+                    loadCustom();
+                }, function (e) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Échec de l\'envoi : ' + e.message);
+                });
+                this.value = '';
+            });
+
+            page.addEventListener('pageshow', function () {
+                loadConfig();
+                loadStatus();
+                loadUsers();
+                loadCustom();
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>

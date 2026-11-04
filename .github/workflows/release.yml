@@ -1,0 +1,74 @@
+name: Release
+
+# Pousser un tag vX.Y.Z publie :
+#   - profile-picker_X.Y.Z.1.zip  -> Jellyfin 12.x    (net10.0, targetAbi 12.0.0.0)
+#   - profile-picker_X.Y.Z.0.zip  -> Jellyfin 10.11.x (net9.0,  targetAbi 10.11.0.0)
+# puis met à jour manifest.json sur main (dépôt de plugins Jellyfin).
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Version
+        id: v
+        run: echo "semver=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & zip
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          build() {
+            local target="$1" rev="$2"
+            local ver="${{ steps.v.outputs.semver }}.${rev}"
+            dotnet build src/Jellyfin.Plugin.ProfilePicker/Jellyfin.Plugin.ProfilePicker.csproj \
+              -c Release -p:JellyfinTarget="$target" -p:Version="$ver" -p:AssemblyVersion="$ver" -p:FileVersion="$ver" \
+              -o "build/$target"
+            (cd "build/$target" && zip -j "../../dist/profile-picker_${ver}.zip" Jellyfin.Plugin.ProfilePicker.dll)
+          }
+          build 10.11 0
+          build 12 1
+          ls -l dist
+
+      - name: Notes de version
+        run: |
+          git log --pretty='- %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)"..HEAD > notes.md || true
+          [ -s notes.md ] || echo "- Version ${{ steps.v.outputs.semver }}" > notes.md
+          cat notes.md
+
+      - name: Publier la release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "$GITHUB_REF_NAME" --notes-file notes.md
+
+      - name: Mettre à jour manifest.json
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout main
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          v="${{ steps.v.outputs.semver }}"
+          python3 scripts/update_manifest.py manifest.json "$GITHUB_REPOSITORY" notes.md \
+            "${v}.1|12.0.0.0|${base}/profile-picker_${v}.1.zip|dist/profile-picker_${v}.1.zip" \
+            "${v}.0|10.11.0.0|${base}/profile-picker_${v}.0.zip|dist/profile-picker_${v}.0.zip"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "manifest: ${GITHUB_REF_NAME}"
+          git push origin main

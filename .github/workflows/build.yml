@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['manifest.json', '**.md']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Jellyfin ${{ matrix.jellyfin }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        jellyfin: ['12', '10.11']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Vérifier la syntaxe du client JS
+        run: node --check src/Jellyfin.Plugin.ProfilePicker/Web/profile-picker.js
+
+      - name: Build
+        run: >
+          dotnet build src/Jellyfin.Plugin.ProfilePicker/Jellyfin.Plugin.ProfilePicker.csproj
+          -c Release -p:JellyfinTarget=${{ matrix.jellyfin }} -o out
+
+      - name: Vérifier les ressources embarquées
+        run: |
+          python3 - <<'EOF'
+          import zipfile, pathlib
+          dll = pathlib.Path('out/Jellyfin.Plugin.ProfilePicker.dll').read_bytes()
+          for needle in [b'profile-picker.js', b'profile-picker.css', b'configPage.html', b'Avatars.animaux.chat.png']:
+              assert needle in dll, needle
+          print('ressources OK')
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: profile-picker-jf${{ matrix.jellyfin }}
+          path: out/Jellyfin.Plugin.ProfilePicker.dll
