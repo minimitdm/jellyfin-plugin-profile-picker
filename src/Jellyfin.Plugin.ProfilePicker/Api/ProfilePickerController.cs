@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Mime;
-using System.Security.Authentication;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.ProfilePicker.Services;
@@ -289,7 +288,7 @@ public class ProfilePickerController : ControllerBase
             _logger.LogInformation("[ProfilePicker] Foyer « {Household} » : bascule {From} -> {To}", h.Name, me, profileId);
             return Ok(result);
         }
-        catch (Exception ex) when (ex is MediaBrowser.Controller.Net.SecurityException or System.Security.SecurityException or AuthenticationException)
+        catch (Exception ex) when (ex is MediaBrowser.Controller.Net.SecurityException or System.Security.SecurityException or MediaBrowser.Controller.Authentication.AuthenticationException or System.Security.Authentication.AuthenticationException)
         {
             return ToJson(new { Error = "denied", ex.Message }, StatusCodes.Status403Forbidden);
         }
