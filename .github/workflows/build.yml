@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches: [main]
-    paths-ignore: ['manifest.json', '**.md']
+    paths-ignore: ['manifest.json', '**.md', 'VERSION']
   pull_request:
   workflow_dispatch:
 

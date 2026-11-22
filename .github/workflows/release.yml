@@ -1,13 +1,15 @@
 name: Release
 
-# Pousser un tag vX.Y.Z publie :
+# Modifier le fichier VERSION sur main (ou lancer le workflow à la main) publie :
 #   - profile-picker_X.Y.Z.1.zip  -> Jellyfin 12.x    (net10.0, targetAbi 12.0.0.0)
 #   - profile-picker_X.Y.Z.0.zip  -> Jellyfin 10.11.x (net9.0,  targetAbi 10.11.0.0)
 # puis met à jour manifest.json sur main (dépôt de plugins Jellyfin).
 
 on:
   push:
-    tags: ['v*.*.*']
+    branches: [main]
+    paths: ['VERSION']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,9 +30,16 @@ jobs:
 
       - name: Version
         id: v
-        run: echo "semver=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          v="$(tr -d ' \r\n' < VERSION)"
+          echo "semver=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Build & zip
+        if: steps.v.outputs.exists == 'false'
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -47,22 +56,26 @@ jobs:
           ls -l dist
 
       - name: Notes de version
+        if: steps.v.outputs.exists == 'false'
         run: |
           git log --pretty='- %s' "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)"..HEAD > notes.md || true
           [ -s notes.md ] || echo "- Version ${{ steps.v.outputs.semver }}" > notes.md
           cat notes.md
 
       - name: Publier la release GitHub
+        if: steps.v.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "$GITHUB_REF_NAME" --notes-file notes.md
+        run: gh release create "${{ steps.v.outputs.tag }}" dist/*.zip --target "$GITHUB_SHA" --title "${{ steps.v.outputs.tag }}" --notes-file notes.md
 
       - name: Mettre à jour manifest.json
+        if: steps.v.outputs.exists == 'false'
         run: |
           set -euo pipefail
           git fetch origin main
           git checkout main
-          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          git pull --ff-only origin main
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.v.outputs.tag }}"
           v="${{ steps.v.outputs.semver }}"
           python3 scripts/update_manifest.py manifest.json "$GITHUB_REPOSITORY" notes.md \
             "${v}.1|12.0.0.0|${base}/profile-picker_${v}.1.zip|dist/profile-picker_${v}.1.zip" \
@@ -70,5 +83,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git commit -m "manifest: ${GITHUB_REF_NAME}"
+          git commit -m "manifest: ${{ steps.v.outputs.tag }}"
           git push origin main

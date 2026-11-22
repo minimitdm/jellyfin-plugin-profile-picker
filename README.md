@@ -145,10 +145,7 @@ Ajouter des avatars intégrés : déposer des PNG carrés dans `src/Jellyfin.Plu
 
 ### Publier une version
 
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-```
-
+Mettre le numéro dans le fichier `VERSION` (ex. `1.0.1`) et pousser sur `main` — ou lancer *Actions → Release → Run workflow*.
 Le workflow *Release* compile les deux cibles, crée la release GitHub avec les zips et met à jour `manifest.json` sur `main` (checksums MD5 inclus).
 
 ## Licence
