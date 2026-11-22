@@ -59,7 +59,7 @@ Côté clients : jellyfin-web (navigateur, Jellyfin Media Player, apps Android/i
 
 1. Tableau de bord → **Plugins** → **Dépôts** → **+**
    - Nom : `Profile Picker`
-   - URL : `https://raw.githubusercontent.com/<OWNER>/jellyfin-plugin-profile-picker/main/manifest.json`
+   - URL : `https://raw.githubusercontent.com/minimitdm/jellyfin-plugin-profile-picker/main/manifest.json`
 2. **Catalogue** → *Profile Picker* → Installer.
 3. Redémarrer Jellyfin, puis **Ctrl+F5** dans le navigateur.
 

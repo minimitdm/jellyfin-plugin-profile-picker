@@ -5,8 +5,8 @@
     "name": "Profile Picker",
     "overview": "Écran « Qui regarde ? » avec avatars prédéfinis",
     "description": "Remplace la page de connexion de jellyfin-web par une sélection de profils façon plateformes de streaming (avatars, PIN, thèmes) et ajoute une bibliothèque d'avatars prédéfinis gérable depuis le tableau de bord.",
-    "owner": "OWNER",
+    "owner": "minimitdm",
     "category": "General",
-    "imageUrl": "https://raw.githubusercontent.com/OWNER/jellyfin-plugin-profile-picker/main/docs/logo.png"
+    "imageUrl": "https://raw.githubusercontent.com/minimitdm/jellyfin-plugin-profile-picker/main/docs/logo.png"
   }
 ]
