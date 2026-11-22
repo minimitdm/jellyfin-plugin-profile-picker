@@ -397,16 +397,33 @@
         return apiCall('GET', 'ProfilePicker/Profiles');
     }
 
-    function showHouseholdPicker(data, forced) {
+    function profileUser(p) {
+        return { Id: p.id, Name: p.name, PrimaryImageTag: p.imageTag, locked: p.hasPin };
+    }
+
+    function showHouseholdPicker(data, forced, manage) {
         var ui = buildOverlay('household', data.household || serverName);
         overlay.dataset.forced = forced ? '1' : '';
+        if (manage) {
+            overlay.classList.add('pp-manage');
+            overlay.querySelector('.pp-title').textContent = 'Gérer les profils';
+        }
         var current = norm(data.currentUserId);
+        var reopen = function (m) {
+            loadHousehold().then(function (d) {
+                hh.data = d;
+                showHouseholdPicker(d, forced, m);
+            });
+        };
 
         data.profiles.forEach(function (p, i) {
-            var user = { Id: p.id, Name: p.name, PrimaryImageTag: p.imageTag, locked: p.hasPin };
+            var user = profileUser(p);
             addTile(ui.grid, user, i, function () {
+                if (manage) {
+                    editProfile(p, data, function () { reopen(true); });
+                    return;
+                }
                 if (norm(p.id) === current) {
-                    // Profil déjà actif : on ferme simplement l'écran.
                     sessionStorage.setItem(CHOSEN_KEY, current);
                     removeOverlay();
                     return;
@@ -420,21 +437,193 @@
                 } else {
                     switchTo(user, null);
                 }
-            }, !forced && norm(p.id) === current);
+            }, !forced && !manage && norm(p.id) === current);
         });
 
-        if (!data.profiles.length) {
-            ui.grid.appendChild(el('div', 'pp-modal-hint', 'Aucun profil n\'est rattaché à ce compte. Un administrateur doit en créer dans Tableau de bord → Profile Picker.'));
+        if (data.canManage && data.profiles.length < (data.maxProfiles || 6)) {
+            var add = el('button', 'pp-profile pp-add');
+            add.type = 'button';
+            add.style.animationDelay = (data.profiles.length * 45) + 'ms';
+            var box = el('div', 'pp-avatar pp-add-box');
+            box.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>';
+            add.appendChild(box);
+            add.appendChild(el('span', 'pp-name', 'Ajouter un profil'));
+            add.addEventListener('click', function () {
+                editProfile(null, data, function () { reopen(manage); });
+            });
+            ui.grid.appendChild(add);
         }
 
-        if (!forced) {
-            addAction(ui.actions, 'Annuler', function () {
-                sessionStorage.setItem(CHOSEN_KEY, current);
-                removeOverlay();
+        if (manage) {
+            addAction(ui.actions, 'Terminé', function () { reopen(false); });
+        } else {
+            if (data.canManage) {
+                addAction(ui.actions, 'Gérer les profils', function () { reopen(true); });
+            }
+            if (!forced) {
+                addAction(ui.actions, 'Annuler', function () {
+                    sessionStorage.setItem(CHOSEN_KEY, current);
+                    removeOverlay();
+                });
+            }
+            addAction(ui.actions, 'Se déconnecter', signOut);
+        }
+        overlay.classList.remove('pp-loading');
+    }
+
+    // Création (p == null) ou modification d'un profil.
+    function editProfile(p, data, done) {
+        var isCurrent = p && norm(p.id) === norm(data.currentUserId);
+        if (p && p.isAdmin && !isCurrent) {
+            alert('Un profil administrateur ne se modifie que depuis ce profil.');
+            return;
+        }
+        if (p && p.hasPin && !isCurrent) {
+            openSecretModal(profileUser(p), {
+                pin: true,
+                length: data.pinLength,
+                onSubmit: function (v) { closeModal(); openProfileForm(p, data, v, done); }
+            });
+            return;
+        }
+        openProfileForm(p, data, null, done);
+    }
+
+    function openProfileForm(p, data, currentPin, done) {
+        closeModal();
+        var creating = !p;
+        var chosenAvatar = null;
+        var pinLen = data.pinLength || 4;
+        modal = el('div', 'pp-modal');
+        applyTheme(modal);
+        var card = el('div', 'pp-modal-card pp-picker pp-form');
+        card.appendChild(el('h2', 'pp-picker-title', creating ? 'Ajouter un profil' : 'Modifier le profil'));
+
+        var head = el('div', 'pp-form-head');
+        var preview = el('div', 'pp-form-avatar');
+        var setPreview = function (src, user) {
+            preview.innerHTML = '';
+            if (src) {
+                var im = el('img'); im.src = src; im.alt = ''; preview.appendChild(im);
+            } else {
+                preview.appendChild(avatarNode(user || { Name: '?' }, 200));
+            }
+        };
+        setPreview(null, p ? profileUser(p) : { Name: '+' });
+        head.appendChild(preview);
+        var fields = el('div', 'pp-form-fields');
+        var name = el('input', 'pp-pw');
+        name.type = 'text';
+        name.maxLength = 32;
+        name.placeholder = 'Nom du profil';
+        name.value = p ? p.name : '';
+        fields.appendChild(name);
+
+        var pin = el('input', 'pp-pw');
+        pin.type = 'password';
+        pin.inputMode = 'numeric';
+        pin.maxLength = pinLen;
+        pin.autocomplete = 'new-password';
+        pin.placeholder = (p && p.hasPin) ? 'Nouveau PIN (laisser vide = inchangé)' : 'PIN à ' + pinLen + ' chiffres (facultatif)';
+        fields.appendChild(pin);
+
+        var removePin = null;
+        if (p && p.hasPin && !p.isAdmin) {
+            var lbl = el('label', 'pp-check');
+            removePin = el('input'); removePin.type = 'checkbox';
+            lbl.appendChild(removePin);
+            lbl.appendChild(document.createTextNode(' Retirer le PIN'));
+            fields.appendChild(lbl);
+        }
+        head.appendChild(fields);
+        card.appendChild(head);
+
+        card.appendChild(el('h3', 'pp-picker-cat', 'Choisis un avatar'));
+        var body = el('div', 'pp-picker-body');
+        card.appendChild(body);
+        getJSON(BASE + '/ProfilePicker/Avatars').then(function (list) {
+            var g = el('div', 'pp-picker-grid');
+            list.forEach(function (a) {
+                var b = el('button', 'pp-picker-item');
+                b.type = 'button';
+                b.title = a.name;
+                var img = el('img'); img.loading = 'lazy'; img.alt = a.name;
+                img.src = BASE + '/ProfilePicker/Avatars/' + encodeURIComponent(a.id);
+                b.appendChild(img);
+                b.addEventListener('click', function () {
+                    chosenAvatar = a.id;
+                    g.querySelectorAll('.pp-selected').forEach(function (x) { x.classList.remove('pp-selected'); });
+                    b.classList.add('pp-selected');
+                    setPreview(img.src);
+                });
+                g.appendChild(b);
+            });
+            body.appendChild(g);
+            if (creating && list.length) {
+                // Avatar aléatoire par défaut, comme les plateformes de streaming.
+                g.children[Math.floor(Math.random() * list.length)].click();
+            }
+        });
+
+        var err = el('div', 'pp-error');
+        err.setAttribute('role', 'alert');
+        card.appendChild(err);
+
+        var actions = el('div', 'pp-modal-actions');
+        if (p && !p.isAccount && !p.isAdmin && norm(p.id) !== norm(data.currentUserId)) {
+            var del = el('button', 'pp-btn pp-btn-ghost pp-danger', 'Supprimer');
+            del.type = 'button';
+            del.addEventListener('click', function () {
+                if (!confirm('Supprimer le profil « ' + p.name + ' » ? Son historique et ses favoris seront perdus.')) {
+                    return;
+                }
+                modal.classList.add('pp-busy');
+                apiCall('POST', 'ProfilePicker/Profiles/' + p.id + '/Delete', { CurrentPin: currentPin }).then(function () {
+                    closeModal(); done();
+                }, function (resp) { fail(resp); });
+            });
+            actions.appendChild(del);
+        }
+        var cancel = el('button', 'pp-btn pp-btn-ghost', 'Annuler');
+        cancel.type = 'button';
+        cancel.addEventListener('click', closeModal);
+        var save = el('button', 'pp-btn pp-btn-primary', creating ? 'Créer' : 'Enregistrer');
+        save.type = 'button';
+        actions.appendChild(cancel);
+        actions.appendChild(save);
+        card.appendChild(actions);
+
+        function fail(resp) {
+            modal && modal.classList.remove('pp-busy');
+            readError(resp).then(function (e) {
+                err.textContent = (e.body && (e.body.message || e.body.Message)) || ('Erreur ' + e.status);
             });
         }
-        addAction(ui.actions, 'Se déconnecter', signOut);
-        overlay.classList.remove('pp-loading');
+
+        save.addEventListener('click', function () {
+            var v = name.value.trim();
+            if (!v) { err.textContent = 'Indique un nom.'; name.focus(); return; }
+            if (pin.value && !new RegExp('^\\d{' + pinLen + '}$').test(pin.value)) {
+                err.textContent = 'Le PIN doit contenir ' + pinLen + ' chiffres.'; pin.focus(); return;
+            }
+            modal.classList.add('pp-busy');
+            var req = creating
+                ? apiCall('POST', 'ProfilePicker/Profiles', { Name: v, AvatarId: chosenAvatar, Pin: pin.value || null })
+                : apiCall('POST', 'ProfilePicker/Profiles/' + p.id + '/Update', {
+                    Name: v !== p.name ? v : null,
+                    AvatarId: chosenAvatar,
+                    Pin: pin.value || null,
+                    RemovePin: removePin ? removePin.checked : null,
+                    CurrentPin: currentPin
+                });
+            req.then(function () { closeModal(); done(); }, fail);
+        });
+
+        modal.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeModal(); } });
+        modal.addEventListener('click', function (e) { if (e.target === modal) { closeModal(); } });
+        modal.appendChild(card);
+        document.body.appendChild(modal);
+        setTimeout(function () { name.focus(); }, 30);
     }
 
     function switchTo(user, pin) {

@@ -30,6 +30,7 @@ public class ProfilePickerController : ControllerBase
     private readonly AvatarStore _avatars;
     private readonly WebInjector _injector;
     private readonly HouseholdService _households;
+    private readonly ProfileManager _profiles;
     private readonly IUserManager _userManager;
     private readonly ISessionManager _sessionManager;
     private readonly IAuthorizationContext _authContext;
@@ -41,6 +42,7 @@ public class ProfilePickerController : ControllerBase
     /// <param name="avatars">Bibliothèque d'avatars.</param>
     /// <param name="injector">Injecteur web.</param>
     /// <param name="households">Service des foyers.</param>
+    /// <param name="profiles">Gestion des profils.</param>
     /// <param name="userManager">Gestionnaire d'utilisateurs.</param>
     /// <param name="sessionManager">Gestionnaire de sessions.</param>
     /// <param name="authContext">Contexte d'autorisation.</param>
@@ -49,6 +51,7 @@ public class ProfilePickerController : ControllerBase
         AvatarStore avatars,
         WebInjector injector,
         HouseholdService households,
+        ProfileManager profiles,
         IUserManager userManager,
         ISessionManager sessionManager,
         IAuthorizationContext authContext,
@@ -57,6 +60,7 @@ public class ProfilePickerController : ControllerBase
         _avatars = avatars;
         _injector = injector;
         _households = households;
+        _profiles = profiles;
         _userManager = userManager;
         _sessionManager = sessionManager;
         _authContext = authContext;
@@ -181,7 +185,7 @@ public class ProfilePickerController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var h = _households.FindForUser(me);
+        var h = _profiles.GetOrCreateHousehold(me);
         if (h is null)
         {
             return ToJson(new { Household = (string?)null, Profiles = Array.Empty<object>() });
@@ -209,7 +213,9 @@ public class ProfilePickerController : ControllerBase
                 dto.Name,
                 ImageTag = dto.PrimaryImageTag,
                 HasPin = _households.HasPin(id),
-                IsCurrent = id == me
+                IsCurrent = id == me,
+                IsAccount = HouseholdService.IsAccount(h, id),
+                IsAdmin = dto.Policy?.IsAdministrator == true
             });
         }
 
@@ -220,6 +226,8 @@ public class ProfilePickerController : ControllerBase
             IsGate = HouseholdService.IsAccount(h, me) && !selectable.Contains(me),
             CurrentUserId = me.ToString("N"),
             PinLength = Math.Clamp(c.PinLength, 4, 8),
+            CanManage = c.AllowProfileManagement,
+            MaxProfiles = Math.Clamp(c.MaxProfiles, 1, 20),
             Profiles = profiles
         });
     }
@@ -238,6 +246,11 @@ public class ProfilePickerController : ControllerBase
         if (h is null || !HouseholdService.SelectableIds(h).Contains(profileId))
         {
             return ToJson(new { Error = "forbidden", Message = "Ce profil n'appartient pas à ton foyer." }, StatusCodes.Status403Forbidden);
+        }
+
+        if (profileId != me && !_households.HasPin(profileId) && _profiles.IsAdmin(profileId))
+        {
+            return ToJson(new { Error = "adminpin", Message = "Ce profil administrateur doit avoir un PIN : connecte-toi dessus et définis-en un via « Gérer les profils »." }, StatusCodes.Status403Forbidden);
         }
 
         var locked = _households.LockedFor(profileId);
@@ -291,6 +304,62 @@ public class ProfilePickerController : ControllerBase
         catch (Exception ex) when (ex is MediaBrowser.Controller.Net.SecurityException or System.Security.SecurityException or MediaBrowser.Controller.Authentication.AuthenticationException or System.Security.Authentication.AuthenticationException)
         {
             return ToJson(new { Error = "denied", ex.Message }, StatusCodes.Status403Forbidden);
+        }
+    }
+
+    /// <summary>Crée un profil dans le foyer de l'utilisateur connecté.</summary>
+    /// <param name="body">Nom, avatar, PIN.</param>
+    /// <returns>Id du profil.</returns>
+    [HttpPost("Profiles")]
+    [Authorize]
+    public Task<ActionResult> CreateProfile([FromBody] ProfileEditRequest body)
+        => Run(async me => ToJson(new { Id = (await _profiles.CreateAsync(me, body?.Name, body?.AvatarId, body?.Pin).ConfigureAwait(false)).ToString("N") }));
+
+    /// <summary>Modifie un profil du foyer (nom, avatar, PIN).</summary>
+    /// <param name="profileId">Profil.</param>
+    /// <param name="body">Modifications.</param>
+    /// <returns>204.</returns>
+    [HttpPost("Profiles/{profileId}/Update")]
+    [Authorize]
+    public Task<ActionResult> UpdateProfile([FromRoute] Guid profileId, [FromBody] ProfileEditRequest body)
+        => Run(async me =>
+        {
+            await _profiles.UpdateAsync(me, profileId, body ?? new ProfileEditRequest()).ConfigureAwait(false);
+            return ToJson(new { Ok = true });
+        });
+
+    /// <summary>Supprime un profil du foyer.</summary>
+    /// <param name="profileId">Profil.</param>
+    /// <param name="body">PIN actuel éventuel.</param>
+    /// <returns>204.</returns>
+    [HttpPost("Profiles/{profileId}/Delete")]
+    [Authorize]
+    public Task<ActionResult> DeleteProfile([FromRoute] Guid profileId, [FromBody] ProfileEditRequest? body)
+        => Run(async me =>
+        {
+            await _profiles.DeleteAsync(me, profileId, body?.CurrentPin).ConfigureAwait(false);
+            return ToJson(new { Ok = true });
+        });
+
+    private async Task<ActionResult> Run(Func<Guid, Task<ActionResult>> action)
+    {
+        var auth = await _authContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
+        if (auth.UserId == Guid.Empty)
+        {
+            return ToJson(new { Error = "auth", Message = "Non connecté." }, StatusCodes.Status403Forbidden);
+        }
+
+        try
+        {
+            return await action(auth.UserId).ConfigureAwait(false);
+        }
+        catch (ProfileException ex)
+        {
+            return ToJson(new { Error = ex.Code, ex.Message }, ex.Status);
+        }
+        catch (ArgumentException ex)
+        {
+            return ToJson(new { Error = "invalid", ex.Message }, StatusCodes.Status400BadRequest);
         }
     }
 

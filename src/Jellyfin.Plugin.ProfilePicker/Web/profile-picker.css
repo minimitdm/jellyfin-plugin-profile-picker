@@ -254,3 +254,22 @@ html.pp-open, html.pp-open body { overflow: hidden !important; }
 .pp-current .pp-avatar { box-shadow: 0 0 0 3px var(--pp-accent); }
 .pp-switch-item { display: flex !important; align-items: center; gap: 14px; }
 .pp-switch-icon { font-size: 20px !important; opacity: .75; }
+
+/* Ajout / gestion des profils */
+.pp-add-box { display: flex; align-items: center; justify-content: center; background: transparent !important; border: 2px dashed rgba(255,255,255,.35); color: rgba(255,255,255,.6); }
+.pp-add-box svg { width: 42%; height: 42%; }
+.pp-add:hover .pp-add-box, .pp-add:focus-visible .pp-add-box { border-color: #fff; color: #fff; box-shadow: none; background: rgba(255,255,255,.08) !important; }
+.pp-manage .pp-profile:not(.pp-add) .pp-avatar::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.55) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.21a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / 34% no-repeat;
+}
+.pp-form-head { display: flex; gap: 1.2em; width: 100%; align-items: center; margin: .4em 0 .6em; }
+.pp-form-avatar { --pp-tile: 110px; flex: none; width: 110px; height: 110px; border-radius: var(--pp-radius); overflow: hidden; background: #333; }
+.pp-form-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-form-fields { flex: 1; display: flex; flex-direction: column; gap: .6em; text-align: left; }
+.pp-check { font-size: .9em; color: #bbb; cursor: pointer; }
+.pp-picker-item.pp-selected { box-shadow: 0 0 0 3px var(--pp-accent); }
+.pp-danger { color: #ff6b6b !important; margin-right: auto; }
+.pp-danger:hover { border-color: #ff6b6b !important; }
+@media (max-width: 520px) { .pp-form-head { flex-direction: column; } .pp-form-fields { width: 100%; } }

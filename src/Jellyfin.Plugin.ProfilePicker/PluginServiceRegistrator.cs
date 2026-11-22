@@ -15,6 +15,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddSingleton<AvatarStore>();
         serviceCollection.AddSingleton<HouseholdService>();
+        serviceCollection.AddSingleton<ProfileManager>();
         serviceCollection.AddSingleton<WebInjector>();
         serviceCollection.AddHostedService(sp => sp.GetRequiredService<WebInjector>());
     }

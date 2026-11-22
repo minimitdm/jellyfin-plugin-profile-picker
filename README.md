@@ -17,7 +17,17 @@ Deux modes :
 |---|---|
 | ![pin](docs/pin.png) | ![avatars](docs/avatars.png) |
 
-## Mode foyer — mise en place
+## Mode foyer — profils créés par les utilisateurs
+
+Par défaut (*Créer automatiquement un foyer*), **n'importe quel compte qui se connecte devient un foyer** dont il est le premier profil. Depuis l'écran « Qui regarde ? » :
+
+- **Ajouter un profil** : nom, avatar, PIN facultatif. Le plugin crée côté serveur un utilisateur Jellyfin masqué (mot de passe aléatoire), avec les mêmes médiathèques et le même contrôle parental que le compte. Chaque profil a donc son historique, ses favoris et son « Reprendre » à lui.
+- **Gérer les profils** : renommer, changer d'avatar, définir/retirer un PIN, supprimer (le PIN du profil est demandé s'il est verrouillé).
+- Un profil **administrateur** ne peut être ouvert depuis un autre profil que s'il a un PIN, et ne se modifie que depuis lui-même.
+
+![gérer](docs/gerer-profils.png)
+
+## Mode foyer — mise en place manuelle (admin)
 
 1. **Créer le compte de connexion** (Tableau de bord → Utilisateurs) : ex. `famille-martin` avec un mot de passe fort.
    Recommandé : aucun accès aux médiathèques, case *Masquer cet utilisateur des écrans de connexion* cochée.
@@ -112,6 +122,9 @@ const js = document.createElement('script'); js.src = '../ProfilePicker/Client/p
 | DELETE | `/ProfilePicker/Avatars/{id}` | admin |
 | GET | `/ProfilePicker/Profiles` | utilisateur connecté (profils de son foyer) |
 | POST | `/ProfilePicker/Profiles/{id}/Switch` `{"Pin":"1234"}` | utilisateur connecté, même foyer |
+| POST | `/ProfilePicker/Profiles` `{"Name","AvatarId","Pin"}` | membre du foyer (crée un profil) |
+| POST | `/ProfilePicker/Profiles/{id}/Update` `{"Name","AvatarId","Pin","RemovePin","CurrentPin"}` | membre du foyer |
+| POST | `/ProfilePicker/Profiles/{id}/Delete` `{"CurrentPin"}` | membre du foyer |
 | POST | `/ProfilePicker/Profiles/{id}/Pin` `{"Pin":"…"}` (vide = suppression) | admin |
 | GET | `/ProfilePicker/Status` · POST `/ProfilePicker/Inject` | admin |
 

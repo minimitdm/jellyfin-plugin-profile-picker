@@ -20,6 +20,15 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Mode foyer : redemander le profil à chaque nouvelle ouverture de l'application (onglet).</summary>
     public bool AlwaysAskProfile { get; set; } = true;
 
+    /// <summary>Mode foyer : crée automatiquement un foyer pour tout compte qui se connecte sans en avoir.</summary>
+    public bool AutoHousehold { get; set; } = true;
+
+    /// <summary>Mode foyer : les membres d'un foyer peuvent créer, modifier et supprimer leurs profils.</summary>
+    public bool AllowProfileManagement { get; set; } = true;
+
+    /// <summary>Nombre maximum de profils par foyer (compte inclus).</summary>
+    public int MaxProfiles { get; set; } = 6;
+
     /// <summary>Foyers (compte de connexion + profils rattachés).</summary>
     public List<Household> Households { get; set; } = new();
 

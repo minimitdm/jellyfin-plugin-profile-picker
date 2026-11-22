@@ -75,6 +75,17 @@
                         <input is="emby-checkbox" type="checkbox" id="AlwaysAskProfile" />
                         <span>Redemander « Qui regarde ? » à chaque ouverture de Jellyfin (nouvel onglet / relance de l'app)</span>
                     </label>
+                    <label class="checkboxContainer ppc-only-household">
+                        <input is="emby-checkbox" type="checkbox" id="AutoHousehold" />
+                        <span>Créer automatiquement un foyer pour chaque compte qui se connecte (le compte devient le 1er profil)</span>
+                    </label>
+                    <label class="checkboxContainer ppc-only-household">
+                        <input is="emby-checkbox" type="checkbox" id="AllowProfileManagement" />
+                        <span>Les membres d'un foyer peuvent ajouter, modifier et supprimer leurs profils (« Gérer les profils »)</span>
+                    </label>
+                    <div class="inputContainer ppc-only-household" style="max-width:260px">
+                        <input is="emby-input" type="number" id="MaxProfiles" min="1" max="20" label="Profils max par foyer" />
+                    </div>
                 </div>
 
                 <div class="ppc-section ppc-only-household">
@@ -172,8 +183,8 @@
         (function () {
             var pluginId = '28e96038-2eff-428b-bdb2-c2115837e144';
             var page = document.querySelector('#ProfilePickerConfigPage');
-            var bools = ['Enabled', 'AlwaysAskProfile', 'PinMode', 'ShowManualLogin', 'ShowQuickConnect', 'RememberMe', 'AllowUserAvatarChoice', 'AutoInject'];
-            var texts = ['Mode', 'Theme', 'Title', 'AccentColor', 'PinLength'];
+            var bools = ['Enabled', 'AlwaysAskProfile', 'AutoHousehold', 'AllowProfileManagement', 'PinMode', 'ShowManualLogin', 'ShowQuickConnect', 'RememberMe', 'AllowUserAvatarChoice', 'AutoInject'];
+            var texts = ['Mode', 'Theme', 'Title', 'AccentColor', 'PinLength', 'MaxProfiles'];
             var users = [];
             var households = [];
             var locks = {};
@@ -247,6 +258,7 @@
                     c.Title = $('#Title').value || 'Qui regarde ?';
                     c.AccentColor = $('#AccentColor').value || '#e50914';
                     c.PinLength = Math.max(4, Math.min(8, parseInt($('#PinLength').value, 10) || 4));
+                    c.MaxProfiles = Math.max(1, Math.min(20, parseInt($('#MaxProfiles').value, 10) || 6));
                     c.Households = households.filter(function (h) { return h.AccountUserId; });
                     return ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
                         if (silent) { Dashboard.hideLoadingMsg(); } else { Dashboard.processPluginConfigurationUpdateResult(r); }
