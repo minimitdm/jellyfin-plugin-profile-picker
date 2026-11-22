@@ -142,7 +142,7 @@ public class ProfileManager
         var id = user.Id;
         try
         {
-            await _userManager.ChangePassword(id, Convert.ToHexString(RandomNumberGenerator.GetBytes(24))).ConfigureAwait(false);
+            await InvokeCompat("ChangePassword", user, id, Convert.ToHexString(RandomNumberGenerator.GetBytes(24))).ConfigureAwait(false);
             await _userManager.UpdatePolicyAsync(id, BuildPolicy(id, account is null ? null : _userManager.GetUserDto(account).Policy)).ConfigureAwait(false);
 
             if (!string.IsNullOrEmpty(avatarId))
@@ -191,7 +191,7 @@ public class ProfileManager
                     throw new ProfileException(409, "name", "Ce nom est déjà utilisé sur le serveur.");
                 }
 
-                await _userManager.RenameUser(target, current!, display).ConfigureAwait(false);
+                await InvokeCompat("RenameUser", user, target, display, current!).ConfigureAwait(false);
             }
         }
 
@@ -279,6 +279,43 @@ public class ProfileManager
         user.ProfileImage = new Jellyfin.Database.Implementations.Entities.ImageInfo(Path.Combine(dir, "profile" + ext));
         await _providerManager.SaveImage(stream, mime, user.ProfileImage.Path).ConfigureAwait(false);
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+    }
+
+    // La signature de certaines méthodes d'IUserManager a changé entre versions de Jellyfin
+    // (User vs Guid en 1er paramètre, ancien nom ou non) : on résout la surcharge disponible à l'exécution.
+    private Task InvokeCompat(string method, object user, Guid userId, string value, string? oldName = null)
+    {
+        foreach (var m in _userManager.GetType().GetInterfaces().Append(_userManager.GetType())
+                     .SelectMany(t => t.GetMethods())
+                     .Where(m => m.Name == method))
+        {
+            var ps = m.GetParameters();
+            object?[]? args = null;
+            if (ps.Length == 2 && ps[0].ParameterType == typeof(Guid) && ps[1].ParameterType == typeof(string))
+            {
+                args = new object?[] { userId, value };
+            }
+            else if (ps.Length == 2 && ps[0].ParameterType.IsInstanceOfType(user) && ps[1].ParameterType == typeof(string))
+            {
+                args = new object?[] { user, value };
+            }
+            else if (ps.Length == 3 && ps[0].ParameterType == typeof(Guid) && ps[1].ParameterType == typeof(string) && ps[2].ParameterType == typeof(string))
+            {
+                args = new object?[] { userId, oldName ?? string.Empty, value };
+            }
+            else if (ps.Length == 3 && ps[0].ParameterType.IsInstanceOfType(user) && ps[1].ParameterType == typeof(string) && ps[2].ParameterType == typeof(string))
+            {
+                args = new object?[] { user, oldName ?? string.Empty, value };
+            }
+
+            if (args is not null)
+            {
+                var result = m.Invoke(_userManager, args);
+                return result as Task ?? Task.CompletedTask;
+            }
+        }
+
+        throw new ProfileException(500, "compat", $"Méthode IUserManager.{method} introuvable dans cette version de Jellyfin.");
     }
 
     private Household RequireManageable(Guid me)
