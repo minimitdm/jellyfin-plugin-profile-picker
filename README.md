@@ -63,6 +63,17 @@ Côté clients : jellyfin-web (navigateur, Jellyfin Media Player, apps Android/i
 2. **Catalogue** → *Profile Picker* → Installer.
 3. Redémarrer Jellyfin, puis **Ctrl+F5** dans le navigateur.
 
+### Dépôt auto-hébergé (sans GitHub)
+
+Sur un PC Windows avec le SDK .NET 10 (`winget install Microsoft.DotNet.SDK.10`) :
+
+```powershell
+.\scripts\build-local.ps1 -Version 1.0.0 -BaseUrl http://<IP_NAS>/profile-picker
+```
+
+Copier le contenu de `repo\` dans le dossier web correspondant (ex. Synology Web Station : `web\profile-picker\`), puis ajouter `http://<IP_NAS>/profile-picker/manifest.json` dans *Plugins → Dépôts*.
+Nouvelle version : relancer le script avec `-Version 1.0.1` et recopier `repo\` (les anciennes versions sont conservées dans le manifest).
+
 ### Manuelle
 
 Décompresser le zip de la [release](../../releases) dans `<config>/plugins/ProfilePicker_X.Y.Z.N/` puis redémarrer.
